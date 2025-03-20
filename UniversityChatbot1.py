@@ -4,7 +4,7 @@ import numpy as np  # NumPy for array storage & similarity search
 import re  # Regex for text processing
 import json  # JSON for storing faiss_text_store
 import redis  # Redis for caching question-answer pairs
-#import os  # OS operations
+import os  # OS operations
 import openai  # OpenAI API client
 import pandas as pd  # Pandas for Excel processing
 import streamlit as st  # Streamlit for UI
