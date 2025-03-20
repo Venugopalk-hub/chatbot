@@ -1,0 +1,38 @@
+# Core dependencies
+python==3.12
+
+# Web framework for deployment
+streamlit==1.30.0
+
+# OpenAI API client
+openai==1.3.5
+
+# Vector database for fast similarity search
+faiss-cpu==1.7.4
+
+# Sentence transformers for text embeddings
+sentence-transformers==2.2.2
+
+# Redis for caching & semantic search
+redis==5.0.1
+
+# Numerical computation libraries
+numpy==1.26.3
+pandas==2.1.4
+
+# PDF extraction
+PyMuPDF==1.23.3
+
+# Regular expressions (built-in, but explicitly adding for clarity)
+regex==2023.12.25
+
+# JSON support (built-in, no need to install separately)
+
+# For handling Excel files
+openpyxl==3.1.2
+
+# Date & time operations
+python-dateutil==2.8.2
+
+# For similarity search computations
+scipy==1.11.4
