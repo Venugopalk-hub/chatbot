@@ -1,33 +1,38 @@
-# Web framework for deployment
+# Streamlit for UI
 streamlit==1.30.0
 
-# OpenAI API client
+# OpenAI API Client
 openai==1.3.5
 
-# Vector database for fast similarity search
+# FAISS for vector database
 faiss-cpu==1.7.4
 
-# Sentence transformers for text embeddings
+# Sentence Transformers for text embeddings
 sentence-transformers==2.2.2
 
-# Redis for caching & semantic search
+# Redis for caching and semantic search
 redis==5.0.1
 
-# Numerical computation libraries
+# Core numerical and data libraries
 numpy==1.26.3
 pandas==2.1.4
 
-# PDF extraction
+# PDF processing
 PyMuPDF==1.23.3
 
 # Regular expressions
 regex==2023.12.25
 
-# Excel file processing
+# Excel file handling
 openpyxl==3.1.2
 
-# Date & time operations
+# Date & time utilities
 python-dateutil==2.8.2
 
-# Similarity search computations
+# Scientific computing
 scipy==1.11.4
+
+# Additional dependencies (if needed for compatibility)
+torch==2.2.0
+transformers==4.38.2
+protobuf==4.25.3
