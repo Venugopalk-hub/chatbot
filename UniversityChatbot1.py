@@ -28,7 +28,13 @@ SYNONYM_MAP = {
 print("Step 1:", time.strftime('%Y-%m-%d %H:%M:%S'))
 
 # Connect to Redis (Ensure Redis is running)
-redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
+#redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
+
+# ✅ Get Redis URL from Streamlit secrets
+REDIS_URL = st.secrets["redis"]["url"]
+
+# ✅ Connect to Redis
+redis_client = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
 
 # Load OpenAI API Client
 @st.cache_resource
