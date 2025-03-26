@@ -17,13 +17,12 @@ FAISS_INDEX_FILE = "faiss_index.idx"
 TEXT_STORE_FILE = "faiss_text.json"
 
 SYNONYM_MAP = {
-    "course": ["program", "course", "degree", "qualification"],
-    "program": ["course", "degree", "offering"],
-    "degree": ["program", "course", "academic qualification"],
-    "mba": ["Master of Business Administration"],
-    "bsc": ["Bachelor of Science"],
-    "msc": ["Master of Science"],
-    "phd": ["Doctorate", "Doctor of Philosophy"],
+    "courses": ["programs", "degrees", "qualifications"],
+    "programs": ["courses", "degrees", "offerings"],
+    "degrees": ["programs", "courses", "academic qualifications"],
+    "MBA": ["Master of Business Administration"],
+    "BSc": ["Bachelor of Science"],
+    "PhD": ["Doctorate", "Doctor of Philosophy"],
 }
 
 print("Step 1:", time.strftime('%Y-%m-%d %H:%M:%S'))
@@ -77,7 +76,7 @@ print("Step 2:",  time.strftime('%Y-%m-%d %H:%M:%S'))
 if index.ntotal != len(faiss_text_store):
     print(" FAISS and faiss_text_store are out of sync. Required reload.")
 else:
-    print(" FAISS and faiss_text_store are in sync.")
+     print(" FAISS and faiss_text_store are in sync.")
 
 # Extract Text from PDF
 @st.cache_resource
@@ -175,6 +174,97 @@ def split_text_by_headings(text, chunk_size, overlap):
     return final_merged_sections
 
 
+# To split text with table protection and overlap
+def split_text_with_table_protection(text, chunk_size, overlap):
+    """Splits text while keeping tables intact."""
+    chunks = []
+    lines = text.split("\n")
+    current_chunk = ""
+    inside_table = False
+    previous_chunk = ""
+
+    for line in lines:
+        if "[TABLE START]" in line:
+            inside_table = True
+            current_chunk += line + "\n"
+        elif "[TABLE END]" in line:
+            inside_table = False
+            current_chunk += line + "\n"
+        elif inside_table:
+            current_chunk += line + "\n"
+        elif len(current_chunk) + len(line) < chunk_size:
+            current_chunk += line + "\n"
+        else:
+            if previous_chunk:
+                current_chunk = previous_chunk[-overlap:] + "\n" + current_chunk
+            
+            chunks.append(current_chunk.strip())
+            previous_chunk = current_chunk
+            current_chunk = line + "\n"
+
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+
+    return chunks
+
+# To split the extrcated text from PDF by splitting by Headings and with table protection.
+def split_text_combined(text, chunk_size, overlap):
+    sections = split_text_by_headings(text, chunk_size, overlap)
+    final_chunks = []
+    #for section in sections:
+        #section_chunks = split_text_with_table_protection(section, chunk_size, overlap)
+        #final_chunks.extend(section_chunks)
+    #return final_chunks
+    return sections
+
+#Reads Excel file and extracts structured program details grouped by university.
+def process_excel_data(file_path):
+    # Load the Excel file
+    df = pd.read_excel(file_path, header=0)  # Ensure correct header row
+
+    # Clean column names (remove spaces, lowercase)
+    df.columns = df.columns.str.strip().str.lower()
+    
+    #print(df.columns.tolist())  # Debugging: Print column names to verify
+
+    # Identify section headers (like "PROGRAMS AVAILABLE IN XYZ UNIVERSITY")
+    df["is_section_header"] = df["programmes"].str.contains("PROGRAMS AVAILABLE IN", na=False, case=False)
+
+    # Fill missing university names downwards
+    df["university"] = df["programmes"].where(df["is_section_header"]).ffill()
+
+     # Extract unique university names (remove NaN values)
+    #universities = df["university"].dropna().unique().tolist()
+
+    # Filter out section header rows (keep only actual program details)
+    df = df[~df["is_section_header"]].copy()
+
+    # Group programs under their respective universities
+    university_grouped = df.groupby("university").apply(lambda group: "\n".join(
+        [
+            f"- Program: {row.get('programmes', 'N/A')}, Intake: {row.get('programme intake', 'N/A')}, "
+            f"Duration: {row.get('programme duration', 'N/A')}, Fee: {row.get('programme fee', 'N/A')}, "
+            f"Total Fee: {row.get('total programme fees', 'N/A')}"
+            for _, row in group.iterrows()
+        ]
+    )).reset_index()
+
+    # Convert grouped data to structured text
+    structured_texts = [
+        f"University: {row['university']}\nPrograms:\n{row[0]}" 
+        for _, row in university_grouped.iterrows()
+    ]
+    universities = (
+        df["university"]
+        .dropna()
+        .str.replace(r"PROGRAMS AVAILABLE IN \s*", "", regex=True)  # Remove prefix
+        .unique()
+        .tolist()
+    )
+    return structured_texts,universities
+
+
+
 # Convert Text into Embeddings & Store in FAISS
 def store_embeddings(text_chunks, source):
     """Stores text embeddings in FAISS with Redis caching & avoids duplicates."""
@@ -186,14 +276,20 @@ def store_embeddings(text_chunks, source):
     # Set priority: Excel = 1, PDF = 0
     priority = 1 if source == "Excel" else 0  
 
-    for chunk in text_chunks:        
+    for chunk in text_chunks:
+        cache_key = f"embedding:{chunk}"
+        cached_embedding = redis_client.get(cache_key)
+        
         # If text exists in FAISS, skip re-adding
         existing_faiss_id = next((key for key, val in faiss_text_store.items() if val["text"] == chunk), None)
         if existing_faiss_id:
             continue  # Skip duplicate embeddings
 
-        embedding = model.encode(chunk).tolist()      
+        embedding = np.array(eval(cached_embedding)) if cached_embedding else model.encode(chunk).tolist()
         
+        if not cached_embedding:
+            redis_client.set(cache_key, str(embedding))
+
         new_id = last_faiss_id
         last_faiss_id += 1  
 
@@ -215,10 +311,9 @@ def store_embeddings(text_chunks, source):
 
 
 #Finds the most relevant text chunks using FAISS and keyword expansion
-def retrieve_relevant_text(query, top_k=5):
-    query = expand_query_with_synonyms(query)
-    print("Expanded query", query)
+def retrieve_relevant_text(query, top_k=5):    
     model = get_embedding_model()
+
     query_embedding = model.encode(query).reshape(-1)  # Ensure 1D embedding
 
     # Expand FAISS search using more results
@@ -293,7 +388,14 @@ def get_cached_response(question, similarity_threshold=0.85):
 def query_pdf_assistant(user_query):
     relevant_text = retrieve_relevant_text(user_query, top_k=5)
     chat_history = format_chat_history()
-    
+    #print("relevant_text ", relevant_text)
+
+    # if any(keyword in user_query.lower() for keyword in ["this ", " this", "that ", " that", "it ", " it", "he ", " he", "she "," she", "they ", " they", "You ", " You"]):
+    #     chat_history = format_chat_history()  # Send history only for follow-ups
+    #     print("Chat History added")
+    # else:
+    #     chat_history = ""  # Ignore history if it's a new question
+   
     prompt = f"""Document: 'Relevant Section from Brochure'\n\nRelevant Sections:\n{relevant_text} {f"Chat History:\n{chat_history}" if chat_history else ""} \n\nQuestion: {user_query}"""
     
     client = get_openai_client()
@@ -349,11 +451,12 @@ if not index.ntotal:  # Only process if FAISS is empty
     print("Step 3:", time.strftime('%Y-%m-%d %H:%M:%S'))
     pdf_text = extract_text_from_pdf("Kaplan-International-Prospectus-2024.pdf")
     print("Step 4:", time.strftime('%Y-%m-%d %H:%M:%S'))
-    df = pd.read_excel("UniversityPrograms.xlsx")
-    UNIVERSITIES = df["university"].dropna().unique().tolist()
+    excel_texts, UNIVERSITIES = process_excel_data("Kaplan_UniversityPrograms_Intake_And_Fee_structure.xlsx") # Program fees table
     redis_client.set("UNIVERSITIES", json.dumps(UNIVERSITIES))   
+    #print("Step 32, excel_texts:", excel_texts)
+    #store_embeddings(excel_texts, "Excel")
     print("Step 5:", time.strftime('%Y-%m-%d %H:%M:%S'))
-    text_chunks = split_text_by_headings(pdf_text, 4000, 200)
+    text_chunks = split_text_combined(pdf_text, 4000, 200)
     store_embeddings(text_chunks,"PDF")
     print("Step 6:", time.strftime('%Y-%m-%d %H:%M:%S'))
 
