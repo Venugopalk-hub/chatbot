@@ -360,7 +360,7 @@ if not index.ntotal:  # Only process if FAISS is empty
 
 
 # Streamlit UI for Uploading PDF and Asking Questions
-st.title("📖 Kaplan Course Assistant")
+st.title("📖 Kaplan AI Course Assistant")
 st.write("I am happy to help you on the courses offerred at Kaplan for international students.")
 
 
