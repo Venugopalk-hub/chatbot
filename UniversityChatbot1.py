@@ -307,6 +307,7 @@ def query_pdf_assistant(user_query):
 				"Format all numbers and fee components correctly. Use proper spacing in currency values. "
                 "For tabular data, return it in a readable format using Markdown-style tables or line breaks. "
                 "Do not italicize numbers. Use bold for important details."
+				"Format the response in text."
             )},
             {"role": "user", "content": prompt}
         ]
