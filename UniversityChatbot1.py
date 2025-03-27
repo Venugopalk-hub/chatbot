@@ -297,7 +297,7 @@ def query_pdf_assistant(user_query):
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {{"role": "system", "content": (
+            {"role": "system", "content": (
                 "You are an AI assistant answering queries based on Kaplan International Prospectus. Only use the information retrieved from the Brochure. "
                 "If information not found, inform to contect Kaplan website or Kaplan staff at its locations."
                 "Respond in the same language as the question unless instructed otherwise."
