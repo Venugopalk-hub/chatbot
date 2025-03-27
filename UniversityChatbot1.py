@@ -48,23 +48,20 @@ def get_embedding_model():
     return SentenceTransformer("all-MiniLM-L6-v2")
 
 # Load FAISS Index & `faiss_text_store` Together
+# Load FAISS Index (always expect it to be present)
 def load_faiss():
-    """Loads FAISS index if it exists, otherwise creates a new IndexIDMap."""
-    if os.path.exists(FAISS_INDEX_FILE):
-        index = faiss.read_index(FAISS_INDEX_FILE)
-        print(f" FAISS index loaded from {FAISS_INDEX_FILE}. Contains {index.ntotal} embeddings.")
-    else:
-        base_index = faiss.IndexFlatL2(384)  # 384 = embedding dimension
-        index = faiss.IndexIDMap(base_index)
-        print(" No existing FAISS index found. Created a new IndexIDMap.")
+    index = faiss.read_index(FAISS_INDEX_FILE)
+    print(f"✅ FAISS index loaded from {FAISS_INDEX_FILE}. Contains {index.ntotal} embeddings.")
     return index
 
-# Loads text storage from a JSON file if available
+# Load FAISS text store (always expect it to be present)
 def load_faiss_text_store():
-    if os.path.exists(TEXT_STORE_FILE):
-        with open(TEXT_STORE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+    with open(TEXT_STORE_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+index = load_faiss()
+faiss_text_store = load_faiss_text_store()
+last_faiss_id = index.ntotal
 
 index = load_faiss()
 faiss_text_store = load_faiss_text_store()
