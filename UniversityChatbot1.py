@@ -297,14 +297,16 @@ def query_pdf_assistant(user_query):
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": (
+            {{"role": "system", "content": (
                 "You are an AI assistant answering queries based on Kaplan International Prospectus. Only use the information retrieved from the Brochure. "
                 "If information not found, inform to contect Kaplan website or Kaplan staff at its locations."
                 "Respond in the same language as the question unless instructed otherwise."
 				"Format all numbers and fee components correctly. Use proper spacing in currency values. "
                 "For tabular data, return it in a readable format using Markdown-style tables or line breaks. "
                 "Do not italicize numbers. Use bold for important details."
-				"Format the response in text."
+                "Format the response in text."
+                "Provide the fee or cost breakdown if any."
+                "Provide contact details of Kaplan when required."
             )},
             {"role": "user", "content": prompt}
         ]
