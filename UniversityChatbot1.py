@@ -326,11 +326,11 @@ def format_chat_history():
 
 def get_response(user_query):
     #Check Redis cache for existing response.
-    #cached_response = get_cached_response(user_query)
+    cached_response = get_cached_response(user_query)
     
-    #if cached_response:
+    if cached_response:
         #print("Response from cache ", cached_response)
-        #return cached_response  # Return cached response if found
+        return cached_response  # Return cached response if found
 
     # Fetch response from GPT
     response = query_pdf_assistant(user_query)
@@ -341,7 +341,7 @@ def get_response(user_query):
         response = str(response)
 
     # Store new question in cache
-    #store_in_cache(user_query, response)
+    store_in_cache(user_query, response)
     return response
 
 # Extarct data and embeddings
