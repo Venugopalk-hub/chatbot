@@ -36,7 +36,7 @@ REDIS_URL = st.secrets["redis"]["url"]
 
 # ✅ Connect to Redis
 redis_client = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
-
+redis_client.flushdb()
 # Load OpenAI API Client
 @st.cache_resource
 def get_openai_client():
