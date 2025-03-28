@@ -346,7 +346,8 @@ def get_response(user_query):
 
 # Extarct data and embeddings
 if not index.ntotal:  # Only process if FAISS is empty
-    redis_client.flushdb() # clean the Redis DB for every update on the app.
+	# clean the Redis DB for every update on the app.
+	redis_client.flushdb()
     print("Step 3:", time.strftime('%Y-%m-%d %H:%M:%S'))
     pdf_text = extract_text_from_pdf("Kaplan-International-Prospectus-2024.pdf")
     print("Step 4:", time.strftime('%Y-%m-%d %H:%M:%S'))
