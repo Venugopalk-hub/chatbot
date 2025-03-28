@@ -35,13 +35,20 @@ print("Step 1:", time.strftime('%Y-%m-%d %H:%M:%S'))
 REDIS_URL = st.secrets["redis"]["url"]
 
 # ✅ Connect to Redis
-redis_client = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
-
+try:
+    redis_client = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
+except Exception as e:
+        # Handle the error
+        print(f"An error occurred in connecting Redis Cloud: {e}")
+        
 # Load OpenAI API Client
 @st.cache_resource
 def get_openai_client():
-    return openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
-
+    try:
+        return openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
+    except Exception as e:
+        # Handle the error
+        print(f"An error occurred in connecting OpenAI API: {e}")
 # Load Embedding Model (Efficient)
 @st.cache_resource
 def get_embedding_model():
@@ -50,14 +57,21 @@ def get_embedding_model():
 # Load FAISS Index & `faiss_text_store` Together
 # Load FAISS Index (always expect it to be present)
 def load_faiss():
-    index = faiss.read_index(FAISS_INDEX_FILE)
-    print(f"✅ FAISS index loaded from {FAISS_INDEX_FILE}. Contains {index.ntotal} embeddings.")
-    return index
-
+    try:
+        index = faiss.read_index(FAISS_INDEX_FILE)
+        print(f"✅ FAISS index loaded from {FAISS_INDEX_FILE}. Contains {index.ntotal} embeddings.")
+        return index
+    except Exception as e:
+        # Handle the error
+        print(f"An error occurred in getting FAISS Index: {e}")
 # Load FAISS text store (always expect it to be present)
 def load_faiss_text_store():
-    with open(TEXT_STORE_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(TEXT_STORE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        # Handle the error
+        print(f"An error occurred in getting FAISS JSON mapping file: {e}")
 
 index = load_faiss()
 faiss_text_store = load_faiss_text_store()
