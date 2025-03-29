@@ -1,10 +1,8 @@
 import fitz  # PyMuPDF for PDF extraction
 import faiss  # FAISS for vector storage
 import numpy as np  # NumPy for array storage & similarity search
-import re  # Regex for text processing
 import json  # JSON for storing faiss_text_store
 import redis  # Redis for caching question-answer pairs
-import os  # OS operations
 import openai  # OpenAI API client
 import pandas as pd  # Pandas for Excel processing
 import streamlit as st  # Streamlit for UI
@@ -12,67 +10,65 @@ import time  # For timestamps
 from sentence_transformers import SentenceTransformer  # Sentence embeddings
 from scipy.spatial.distance import cosine  # For similarity search
 
-
+# FAISS Index file names
 FAISS_INDEX_FILE = "faiss_index.idx"
 TEXT_STORE_FILE = "faiss_text.json"
 
+# Synonym map
 SYNONYM_MAP = {
     "course": ["program", "course", "degree", "qualification"],
     "program": ["course", "degree", "offering"],
     "degree": ["program", "course", "academic qualification"],
     "mba": ["Master of Business Administration"],
     "bsc": ["Bachelor of Science"],
-    "msc": ["Master of Science"],
-    "phd": ["Doctorate", "Doctor of Philosophy"],
+    "msc": ["Master of Science"]
 }
 
-print("Step 1:", time.strftime('%Y-%m-%d %H:%M:%S'))
-
 # Connect to Redis (Ensure Redis is running)
-#redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
-
-# ✅ Get Redis URL from Streamlit secrets
+# Get Redis URL from Streamlit secrets - Cloud Environment
 REDIS_URL = st.secrets["redis"]["url"]
-
-# ✅ Connect to Redis
+# Connect to Redis
 try:
     redis_client = redis.StrictRedis.from_url(REDIS_URL, decode_responses=True)
+    #redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True) #For development environment
 except Exception as e:
-        # Handle the error
-        print(f"An error occurred in connecting Redis Cloud: {e}")
+    print(f"An error occurred in connecting Redis Cloud: {e}")
         
 # Load OpenAI API Client
 @st.cache_resource
 def get_openai_client():
     try:
         return openai.OpenAI(api_key=st.secrets["openai"]["api_key"])
+        # return openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY")) # For development environment
     except Exception as e:
-        # Handle the error
         print(f"An error occurred in connecting OpenAI API: {e}")
+
 # Load Embedding Model (Efficient)
 @st.cache_resource
 def get_embedding_model():
     return SentenceTransformer("all-MiniLM-L6-v2")
 
+print("Step 1: Connection initiated to OpenAI and Redis", time.strftime('%Y-%m-%d %H:%M:%S'))
+
 # Load FAISS Index & `faiss_text_store` Together
-# Load FAISS Index (always expect it to be present)
+# Load FAISS Index (always expect it to be present at GitHub Repository. If not, generate locally and copy them to Repository)
 def load_faiss():
     try:
         index = faiss.read_index(FAISS_INDEX_FILE)
-        print(f"✅ FAISS index loaded from {FAISS_INDEX_FILE}. Contains {index.ntotal} embeddings.")
+        print(f"FAISS index loaded from {FAISS_INDEX_FILE}. Contains {index.ntotal} embeddings.")
         return index
     except Exception as e:
-        # Handle the error
         print(f"An error occurred in getting FAISS Index: {e}")
-# Load FAISS text store (always expect it to be present)
+
+# Load FAISS text store(always expect it to be present at GitHub Repository. If not, generate locally and copy them to Repository)
 def load_faiss_text_store():
     try:
         with open(TEXT_STORE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        # Handle the error
         print(f"An error occurred in getting FAISS JSON mapping file: {e}")
 
+#Load Index and JSON text store
 index = load_faiss()
 faiss_text_store = load_faiss_text_store()
 last_faiss_id = index.ntotal
@@ -81,14 +77,13 @@ index = load_faiss()
 faiss_text_store = load_faiss_text_store()
 last_faiss_id = index.ntotal 
     
-print("Step 2:",  time.strftime('%Y-%m-%d %H:%M:%S'))
-
-
 # Ensure FAISS & `faiss_text_store` Stay in Sync
 if index.ntotal != len(faiss_text_store):
-    print(" FAISS and faiss_text_store are out of sync. Required reload.")
+    print(" FAISS and faiss_text_store are out of sync. Required to regenerate these files.")
 else:
     print(" FAISS and faiss_text_store are in sync.")
+
+print("Step 2: Both FAISS files loaded", time.strftime('%Y-%m-%d %H:%M:%S'))
 
 # Extract Text from PDF
 @st.cache_resource
@@ -220,7 +215,7 @@ def store_embeddings(text_chunks, source):
             json.dump(faiss_text_store, f, ensure_ascii=False, indent=4)
         print(f"Added {len(new_vectors)} new embeddings and updated FAISS index.")
     else:
-        print("⚠️ No new embeddings added. FAISS and text store are up to date.")
+        print("No new embeddings added. FAISS and text store are up to date.")
 
 
 
@@ -303,8 +298,7 @@ def get_cached_response(question, similarity_threshold=0.85):
 # Step 6: Query GPT with Retrieved Context
 def query_pdf_assistant(user_query):
     relevant_text = retrieve_relevant_text(user_query, top_k=5)
-    chat_history = format_chat_history()
-    
+    chat_history = format_chat_history()    
     prompt = f"""Document: 'Relevant Section from Brochure'\n\nRelevant Sections:\n{relevant_text} {f"Chat History:\n{chat_history}" if chat_history else ""} \n\nQuestion: {user_query}"""
     
     client = get_openai_client()
@@ -325,9 +319,7 @@ def query_pdf_assistant(user_query):
             {"role": "user", "content": prompt}
         ]
     ) 
-    return response.choices[0].message.content
-    #return st.text(relevant_text)
-    #return prompt
+    return response.choices[0].message.content   
 
 # Format chat history for OpenAI API to maintain context."
 def format_chat_history():
@@ -361,22 +353,21 @@ def get_response(user_query):
 # Extarct data and embeddings
 if not index.ntotal:  # Only process if FAISS is empty
     redis_client.flushdb()
-    print("Step 3:", time.strftime('%Y-%m-%d %H:%M:%S'))
+    print("Step 3, Redis cache removed:", time.strftime('%Y-%m-%d %H:%M:%S'))
     pdf_text = extract_text_from_pdf("Kaplan-International-Prospectus-2024.pdf")
-    print("Step 4:", time.strftime('%Y-%m-%d %H:%M:%S'))
+    print("Step 4: Extracted text from PDF", time.strftime('%Y-%m-%d %H:%M:%S'))
     df = pd.read_excel("UniversityPrograms.xlsx") # to retrieve University names from pdf
     UNIVERSITIES = df["university"].dropna().unique().tolist()
     redis_client.set("UNIVERSITIES", json.dumps(UNIVERSITIES))   
-    print("Step 5:", time.strftime('%Y-%m-%d %H:%M:%S'))
+    print("Step 5: Extrcated University Names", time.strftime('%Y-%m-%d %H:%M:%S'))
     text_chunks = split_text_by_headings(pdf_text, 4000, 200)
     store_embeddings(text_chunks,"PDF")
-    print("Step 6:", time.strftime('%Y-%m-%d %H:%M:%S'))
+    print("Step 6: Embeddings created", time.strftime('%Y-%m-%d %H:%M:%S'))
 
 
 # Streamlit UI for Uploading PDF and Asking Questions
 st.title("📖 Kaplan AI Course Assistant")
 st.write("I am happy to help you on the courses offerred at Kaplan for international students.")
-
 
 if "messages" not in st.session_state:
     st.session_state.messages = []  # Stores chat messages
@@ -390,7 +381,6 @@ else:
 if user_input := st.chat_input("Enter your question..."):
     # Store user message
     st.session_state.messages.append({"role": "user", "content": user_input})
-
     with st.chat_message("user"):  # Append Question to session
         st.text(user_input)
 
